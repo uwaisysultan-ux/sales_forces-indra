@@ -97,7 +97,7 @@ const db = firebase.firestore();
 const ADM="Admin/Manager",JENIS=["call","ekspansi","probing","presentasi","closing","maintenance"],N=13;
 const DM=["M. Izzat","Vacant Retail","Dwi Prakoso","Azmi Hanif","Kevin"];
 let cfg={members:DM.slice(),target:{call:200,visit:60,pagu:300000}};
-const MEM=cfg.members,T=cfg.target;
+let MEM=cfg.members,T=cfg.target;
 
 let S={};
 let P={};
@@ -114,16 +114,15 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const rp=n=>"Rp "+Math.round(n).toLocaleString("id-ID");
 const blank=()=>({nama:"",alamat:"",call:0,visit:0,jenis:"call",ket:"",kmA:0,kmB:0,foto:false});
 
-// Real-time listener Firestore agar antar device otomatis sinkron
-const activeListeners = {};
+const activeListeners={};
 const day=(m,d)=>{
   S[m]=S[m]||{};
-  if(!S[m][d]) {
+  if(!S[m][d]){
     S[m][d]=Array.from({length:N},blank);
-    const listenerKey = m+"_"+d;
-    if(!activeListeners[listenerKey]){
-      activeListeners[listenerKey] = db.collection("sales_data").doc(listenerKey).onSnapshot(doc=>{
-        if(doc.exists && doc.data().rows){
+    const k=m+"_"+d;
+    if(!activeListeners[k]){
+      activeListeners[k]=db.collection("sales_data").doc(k).onSnapshot(doc=>{
+        if(doc.exists&&doc.data().rows){
           S[m][d]=doc.data().rows;
           render();
         }
@@ -133,11 +132,7 @@ const day=(m,d)=>{
   return S[m][d];
 };
 
-const save=(m,d)=>{
-  try{
-    db.collection("sales_data").doc(m+"_"+d).set({rows:S[m][d]});
-  }catch(e){console.error(e);}
-};
+const save=(m,d)=>{try{db.collection("sales_data").doc(m+"_"+d).set({rows:S[m][d]})}catch(e){}};
 
 const km=e=>e.kmB>e.kmA&&e.kmA>=0?e.kmB-e.kmA:0;
 const bbm=k=>k/12*10000;
@@ -245,7 +240,6 @@ $("#file").onchange=e=>{
  r.readAsText(f);
 };
 
-/* Logo & Tema Yakesma dengan SVG bawaan agar pasti muncul */
 const logoHtml=(h,full)=>{
   return `<svg viewBox="0 0 64 64" width="${h}" height="${h}" role="img" aria-label="Yakesma"><defs><linearGradient id="yg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f613e"/><stop offset="1" stop-color="#27993c"/></linearGradient></defs><rect width="64" height="64" rx="16" fill="url(#yg)"/><path d="M18 17l14 18 14-18" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 35v15" stroke="#fff" stroke-width="7" stroke-linecap="round"/><circle cx="48" cy="14" r="5" fill="#f9c80b"/></svg>`;
 };
@@ -348,7 +342,7 @@ function tSet(el){
  <h2>Anggota &amp; PIN</h2><div class="card">${MEM.map((x,i)=>`<div class="ct" style="margin-bottom:8px;flex-wrap:wrap"><span style="min-width:130px">${esc(x)}</span><input data-pi="${i}" value="${esc(getPin(x))}" maxlength="6" inputmode="numeric" style="width:100px"><button data-sp="${i}" style="width:auto;padding:7px 12px">Simpan PIN</button><button class="d" data-del="${i}" style="width:auto;padding:7px 12px">Hapus</button></div>`).join("")}<div class="mu">PIN admin diganti lewat tombol Ganti PIN di atas.</div></div>
  <h2>Tambah anggota</h2><div class="card grid"><div><label>Nama</label><input id="an"></div><div><label>PIN (4–6 angka)</label><input id="ap" maxlength="6" inputmode="numeric"></div><div style="align-self:end"><button class="p" id="aa">Tambah</button></div></div>`;
  $("#ts").onclick=()=>{const c=+$("#tc").value,v=+$("#tv").value,p=+$("#tp").value;if(c<1||v<1||p<0)return alert("Target tidak valid.");T.call=c;T.visit=v;T.pagu=p;alert("Target disimpan.")};
- document.querySelectorAll("[data-sp]").forEach(b=>b.onclick=()=>{const i=+b.dataset.sp,v=document.querySelector(`[data-pi="${i}"]`).value;if(!/^\d{4,6}$/.test(v))return alert("PIN harus 4–6 angka.");setPin(MEM[i],v);alert("PIN "+MEM[i]+" disimpan.")};
+ document.querySelectorAll("[data-sp]").forEach(b=>b.onclick=()=>{const i=+b.dataset.sp,v=document.querySelector(`[data-pi="${i}"]`).value;if(!/^\d{4,6}$/.test(v))return alert("PIN harus 4–6 angka.");setPin(MEM[i],v);alert("PIN "+MEM[i]+" disimpan.")});
  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{const i=+b.dataset.del;if(MEM.length<2)return alert("Minimal 1 anggota.");if(confirm("Hapus "+MEM[i]+" dari daftar anggota?")){MEM.splice(i,1);render()}});
  $("#aa").onclick=()=>{const n=$("#an").value.trim(),p=$("#ap").value;if(!n||n===ADM||MEM.includes(n))return alert("Nama kosong atau sudah dipakai.");if(!/^\d{4,6}$/.test(p))return alert("PIN harus 4–6 angka.");MEM.push(n);setPin(n,p);render()}}
 
@@ -359,16 +353,6 @@ function render(){
 }
 
 render();
-
-// Ambil konfigurasi global dari Firestore secara real-time
-db.collection("sales_config").doc("main").onSnapshot(doc=>{
-  if(doc.exists){
-    const d=doc.data();
-    if(d.members) MEM.splice(0, MEM.length, ...d.members);
-    if(d.target) Object.assign(T, d.target);
-    render();
-  }
-});
 </script>
 </body>
 </html>
