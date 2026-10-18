@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aktivitas Sales</title>
-  <!-- SDK Firebase -->
+<!-- SDK Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -82,18 +82,28 @@ footer{text-align:center;color:var(--mu);font-size:12px;padding:22px 10px 28px;d
 <main id="app"></main>
 <footer id="ft"></footer>
 <script>
+/* Inisialisasi Firebase */
+const firebaseConfig = {
+  apiKey: "AIzaSyBxZV3ndLBSuFbFfGFAkBzzNwNULecAnpw",
+  authDomain: "salesforces-99e1a.firebaseapp.com",
+  projectId: "salesforces-99e1a",
+  storageBucket: "salesforces-99e1a.appspot.com",
+  messagingSenderId: "557795182418",
+  appId: "1:557795182418:web:e13252158c3ace98d79c8b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 const ADM="Admin/Manager",JENIS=["call","ekspansi","probing","presentasi","closing","maintenance"],N=13;
 const DM=["M. Izzat","Vacant Retail","Dwi Prakoso","Azmi Hanif","Kevin"];
 let cfg={members:DM.slice(),target:{call:200,visit:60,pagu:300000}};
-try{const c=JSON.parse(localStorage.getItem("sales_cfg")||"null");if(c){if(Array.isArray(c.members))cfg.members=c.members;Object.assign(cfg.target,c.target||{})}}catch(e){}
-const MEM=cfg.members,T=cfg.target;
-const saveCfg=()=>{try{localStorage.setItem("sales_cfg",JSON.stringify({members:MEM,target:T}))}catch(e){}};
-let S={};try{S=JSON.parse(localStorage.getItem("sales_v1")||"{}")}catch(e){}
-const save=()=>{try{localStorage.setItem("sales_v1",JSON.stringify(S))}catch(e){}};
-let P={};try{P=JSON.parse(localStorage.getItem("sales_pins")||"{}")}catch(e){}
+let S={};
+let P={};
 const DEF={"M. Izzat":"1111","Vacant Retail":"2222","Dwi Prakoso":"3333","Azmi Hanif":"4444","Kevin":"5555",[ADM]:"9999"};
 const getPin=n=>P[n]||DEF[n]||"0000";
 const setPin=(n,p)=>{P[n]=p;try{localStorage.setItem("sales_pins",JSON.stringify(P))}catch(e){}};
+try{P=JSON.parse(localStorage.getItem("sales_pins")||"{}")}catch(e){}
+
 const today=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 let su=null;try{su=sessionStorage.getItem("u")}catch(e){}
 let st={user:[...MEM,ADM].includes(su)?su:null,date:today(),tab:"dash",per:"w",sel:MEM[0],mm:today().slice(0,7),ms:"all"};
@@ -101,7 +111,30 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const rp=n=>"Rp "+Math.round(n).toLocaleString("id-ID");
 const blank=()=>({nama:"",alamat:"",call:0,visit:0,jenis:"call",ket:"",kmA:0,kmB:0,foto:false});
-const day=(m,d)=>{S[m]=S[m]||{};if(!S[m][d])S[m][d]=Array.from({length:N},blank);return S[m][d]};
+
+const MEM=cfg.members,T=cfg.target;
+
+// Sinkronisasi data Firestore per tanggal & member
+const day=(m,d)=>{
+  S[m]=S[m]||{};
+  if(!S[m][d]) {
+    S[m][d]=Array.from({length:N},blank);
+    db.collection("sales_data").doc(m+"_"+d).get().then(doc=>{
+      if(doc.exists && doc.data().rows){
+        S[m][d]=doc.data().rows;
+        render();
+      }
+    });
+  }
+  return S[m][d];
+};
+
+const save=(m,d)=>{
+  try{
+    db.collection("sales_data").doc(m+"_"+d).set({rows:S[m][d]});
+  }catch(e){console.error(e);}
+};
+
 const km=e=>e.kmB>e.kmA&&e.kmA>=0?e.kmB-e.kmA:0;
 const bbm=k=>k/12*10000;
 const pct=(a,b)=>b?Math.min(100,Math.round(a/b*100)):0;
@@ -166,7 +199,6 @@ function xlsx(sh){const R="http://schemas.openxmlformats.org/officeDocument/2006
  ["xl/workbook.xml",HX+`<workbook xmlns="${M}" xmlns:r="${R}"><sheets>`+sh.map((x,i)=>`<sheet name="${xe(x[0])}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join("")+"</sheets></workbook>"],
  ["xl/_rels/workbook.xml.rels",HX+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sh.map((x,i)=>`<Relationship Id="rId${i+1}" Type="${R}/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("")+"</Relationships>"],
  ...sh.map((x,i)=>[`xl/worksheets/sheet${i+1}.xml`,sheetXml(x[1])])])}
-/* END XLSX */
 
 function exportXlsx(){
  if(!st.user)return;
@@ -182,7 +214,6 @@ function exportXlsx(){
  const url=URL.createObjectURL(xlsx([["Rekap Anggota",A],["Rekap Mitra",B],["Detail Aktivitas",C]])),l=document.createElement("a");
  l.href=url;l.download="rekap-sales-"+lbl+".xlsx";document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(url),5000)}
 
-/* ---------- Backup & Import ---------- */
 $("#bk").onclick=()=>{
  const dataStr="data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify({S,P,cfg}));
  const dlAnchor=document.createElement("a");
@@ -200,9 +231,9 @@ $("#file").onchange=e=>{
  r.onload=ev=>{
   try{
    const d=JSON.parse(ev.target.result);
-   if(d.S)S=d.S,save();
+   if(d.S)S=d.S;
    if(d.P)P=d.P,localStorage.setItem("sales_pins",JSON.stringify(P));
-   if(d.cfg)cfg=d.cfg,saveCfg();
+   if(d.cfg)cfg=d.cfg;
    alert("Data berhasil diimpor.");
    render();
   }catch(err){alert("File backup tidak valid.");}
@@ -210,14 +241,16 @@ $("#file").onchange=e=>{
  r.readAsText(f);
 };
 
-/* ---------- Tema & logo Yakesma ---------- */
-const LOGO="logo-yakesma.png";
-const ICON="icon-yakesma.png";
+/* Logo & Tema Yakesma dengan fallback SVG publik agar tidak patah */
+const LOGO="https://raw.githubusercontent.com/uwaisysultan-ux/sales_forces-indra/main/logo-yakesma.png";
+const ICON="https://raw.githubusercontent.com/uwaisysultan-ux/sales_forces-indra/main/icon-yakesma.png";
 const QUOTE="Sales adalah proses. Setiap proses dapat diukur. Dan apa yang dapat diukur, dapat ditingkatkan (improved).";
-const logoHtml=(h,full)=>{const u=full?LOGO:ICON;return u?`<img src="${u}" alt="Laznas Yakesma" height="${h}" style="object-fit:contain">`:`<svg viewBox="0 0 64 64" width="${h}" height="${h}" role="img" aria-label="Yakesma"><defs><linearGradient id="yg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b3d6b"/><stop offset="1" stop-color="#0e8a8c"/></linearGradient></defs><rect width="64" height="64" rx="16" fill="url(#yg)"/><path d="M18 17l14 18 14-18" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 35v15" stroke="#fff" stroke-width="7" stroke-linecap="round"/><circle cx="48" cy="14" r="5" fill="#f2b134"/></svg>`};
+const logoHtml=(h,full)=>{
+  const u=full?LOGO:ICON;
+  return `<img src="${u}" alt="Laznas Yakesma" height="${h}" style="object-fit:contain" onerror="this.onerror=null;this.src='data:image/svg+xml;utf8,<svg viewBox=\\'0 0 64 64\\' width=\\'${h}\\' height=\\'${h}\\' xmlns=\\'http://www.w3.org/2000/svg\\'><rect width=\\'64\\' height=\\'64\\' rx=\\'16\\' fill=\\'%231f613e\\'/><path d=\\'M18 17l14 18 14-18\\' fill=\\'none\\' stroke=\\'%23fff\\' stroke-width=\\'7\\' stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\'/><path d=\\'M32 35v15\\' stroke=\\'%23fff\\' stroke-width=\\'7\\' stroke-linecap=\\'round\\'/><circle cx=\\'48\\' cy=\\'14\\' r=\\'5\\' fill=\\'%23f9c80b\\'/></svg>';">`;
+};
 const hero=(t,sub)=>`<section class="hero"><div class="hw">${logoHtml(48)}</div><div class="ht"><div class="hs">${sub}</div><h2>${t}</h2></div><blockquote>${QUOTE}</blockquote></section>`;
 
-/* ---------- Login & PIN ---------- */
 function renderLogin(){
  $("#app").innerHTML=`<div class="login"><div class="lgo">${logoHtml(72,1)}</div><h1>Aktivitas Sales</h1><div class="org">Laznas Yakesma</div><blockquote class="q2">${QUOTE}</blockquote><div class="card"><h2 style="margin-top:0">Masuk</h2><label>Nama</label><select id="ln">${[...MEM,ADM].map(x=>`<option>${esc(x)}</option>`).join("")}</select><label style="margin-top:10px">PIN</label><input type="password" id="lp" inputmode="numeric" maxlength="6" autocomplete="off"><div id="le" style="color:var(--wr);min-height:20px;margin:6px 0"></div><button class="p" id="lg" style="width:100%">Masuk</button></div></div>`;
  const go=()=>{const n=$("#ln").value;if($("#lp").value===getPin(n)){st.user=n;st.sel=MEM[0];try{sessionStorage.setItem("u",n)}catch(e){}render()}else{$("#le").textContent="PIN salah.";$("#lp").value=""}};
@@ -226,7 +259,6 @@ $("#pin").onclick=()=>{const o=prompt("Masukkan PIN lama:");if(o===null)return;i
  const n=prompt("PIN baru (4–6 angka):");if(n===null)return;if(!/^\d{4,6}$/.test(n))return alert("PIN harus 4–6 angka.");setPin(st.user,n);alert("PIN berhasil diganti.")};
 $("#out").onclick=()=>{st.user=null;try{sessionStorage.removeItem("u")}catch(e){}render()};
 
-/* ---------- Rekap & form input ---------- */
 function kpiHtml(m,d){const[s,e]=rng("m",d),x=stats(m,s,e),ym=d.slice(0,7);
  return`<div class="card"><b>Capaian vs target · ${ym}</b><div style="margin-top:10px">${bar("Call",x.c,T.call)}${bar("Visit",x.v,T.visit)}</div></div>
  <div class="card"><div class="mu">Total klaim BBM bulan ${ym}</div><div class="big">${rp(x.cl)}</div>
@@ -246,13 +278,14 @@ const card=(e,i)=>`<div class="card"><div class="top"><b>Mitra ${i+1}</b><span c
   <div><label>Visit (x)</label>${counter(i,"visit",e.visit)}</div>
   <div><label>Keterangan aktivitas</label><select data-i="${i}" data-k="jenis">${JENIS.map(j=>`<option ${j==e.jenis?"selected":""}>${j}</option>`).join("")}</select></div>
   <div><label>KM awal (klaim BBM visit)</label>${counter(i,"kmA",e.kmA)}</div>
-  <div><label>KM akhir</label>${counter(i,"kmB",e.kmB)}</div>
+  <div><label>KM akhir</label><input type="number" min="0" data-i="${i}" data-k="kmB" value="${e.kmB}"></div>
  </div><label style="margin-top:8px">Penjelasan aktivitas</label><textarea data-i="${i}" data-k="ket">${esc(e.ket)}</textarea><label style="margin-top:8px">Foto aktivitas</label><input type="file" accept="image/*" data-up="${i}"><div id="ph${i}" style="margin-top:6px"></div></div>`;
-const formPart=(m,mid)=>`<div class="card"><label>Tanggal</label><input type="date" id="dt" value="${st.date}" style="max-width:200px"><div class="mu" style="margin-top:6px">Isi hingga ${N} mitra per hari. Data tersimpan otomatis.</div></div>${mid||""}<div id="rows">${day(m,st.date).map(card).join("")}</div>`;
+const formPart=(m,mid)=>`<div class="card"><label>Tanggal</label><input type="date" id="dt" value="${st.date}" style="max-width:200px"><div class="mu" style="margin-top:6px">Isi hingga ${N} mitra per hari. Data tersimpan otomatis ke server.</div></div>${mid||""}<div id="rows">${day(m,st.date).map(card).join("")}</div>`;
+
 function bindForm(m){
  $("#dt").onchange=e=>{st.date=e.target.value||today();render()};
  const NUM=["call","visit","kmA","kmB"],root=$("#rows");
- const upd=(i,k,v)=>{const e=day(m,st.date)[i];e[k]=NUM.includes(k)?Math.max(0,+v||0):v;save();
+ const upd=(i,k,v)=>{const e=day(m,st.date)[i];e[k]=NUM.includes(k)?Math.max(0,+v||0):v;save(m,st.date);
   $("#t"+i).textContent=km(e);$("#r"+i).textContent=rp(bbm(km(e)));
   const a=$("#kpi"),b=$("#rc");if(a)a.innerHTML=kpiHtml(m,st.date);if(b)b.innerHTML=recap(m,st.date)};
  root.addEventListener("input",ev=>{const t=ev.target;if(t.dataset.k)upd(+t.dataset.i,t.dataset.k,t.value)});
@@ -261,13 +294,13 @@ function bindForm(m){
   b.parentNode.querySelector("input").value=day(m,st.date)[i][k]});
  const key=i=>m+"|"+st.date+"|"+i,showPh=(i,src)=>{const h=$("#ph"+i);if(h)h.innerHTML=src?`<img class="th" data-zoom src="${src}"><button class="d" data-rm="${i}">Hapus foto</button>`:""};
  root.addEventListener("change",async ev=>{const t=ev.target;if(!t.dataset.up)return;const i=+t.dataset.up,f=t.files[0];if(!f)return;
-  try{const d=await shrink(f);await pset(key(i),d);day(m,st.date)[i].foto=true;save();showPh(i,d)}catch(x){alert("Foto gagal disimpan.")}t.value=""});
- root.addEventListener("click",async ev=>{const b=ev.target.closest("button[data-rm]");if(!b)return;const i=+b.dataset.rm;await pdel(key(i)).catch(()=>0);day(m,st.date)[i].foto=false;save();showPh(i,"")});
+  try{const d=await shrink(f);await pset(key(i),d);day(m,st.date)[i].foto=true;save(m,st.date);showPh(i,d)}catch(x){alert("Foto gagal disimpan.")}t.value=""});
+ root.addEventListener("click",async ev=>{const b=ev.target.closest("button[data-rm]");if(!b)return;const i=+b.dataset.rm;await pdel(key(i)).catch(()=>0);day(m,st.date)[i].foto=false;save(m,st.date);showPh(i,"")});
  day(m,st.date).forEach((e,i)=>{if(e.foto)pget(key(i)).then(v=>showPh(i,v))})}
+
 function renderMember(){const m=st.user;
  $("#app").innerHTML=hero("Halo, "+esc(m),"Aktivitas Sales · "+fd(today()))+`<div id="kpi">${kpiHtml(m,st.date)}</div>`+formPart(m,`<div id="rc">${recap(m,st.date)}</div>`);bindForm(m)}
 
-/* ---------- Admin ---------- */
 function renderAdmin(){
  const tabs=[["dash","Dashboard"],["edit","Edit Aktivitas"],["mon","Monitoring Mitra"],["set","Target, Anggota & PIN"]];
  $("#app").innerHTML=hero("Dashboard Admin / Manager","Aktivitas Sales · Laznas Yakesma")+`<div class="tabs">${tabs.map(([k,l])=>`<button data-tab="${k}" class="${st.tab===k?"p":""}">${l}</button>`).join("")}</div><div id="tb"></div>`;
@@ -313,17 +346,26 @@ function tSet(el){
  <button class="p" id="ts" style="margin-top:10px">Simpan target</button><div class="mu" style="margin-top:6px">Target mingguan = bulanan ÷ 4, harian = bulanan ÷ 20.</div></div>
  <h2>Anggota &amp; PIN</h2><div class="card">${MEM.map((x,i)=>`<div class="ct" style="margin-bottom:8px;flex-wrap:wrap"><span style="min-width:130px">${esc(x)}</span><input data-pi="${i}" value="${esc(getPin(x))}" maxlength="6" inputmode="numeric" style="width:100px"><button data-sp="${i}" style="width:auto;padding:7px 12px">Simpan PIN</button><button class="d" data-del="${i}" style="width:auto;padding:7px 12px">Hapus</button></div>`).join("")}<div class="mu">PIN admin diganti lewat tombol Ganti PIN di atas.</div></div>
  <h2>Tambah anggota</h2><div class="card grid"><div><label>Nama</label><input id="an"></div><div><label>PIN (4–6 angka)</label><input id="ap" maxlength="6" inputmode="numeric"></div><div style="align-self:end"><button class="p" id="aa">Tambah</button></div></div>`;
- $("#ts").onclick=()=>{const c=+$("#tc").value,v=+$("#tv").value,p=+$("#tp").value;if(c<1||v<1||p<0)return alert("Target tidak valid.");T.call=c;T.visit=v;T.pagu=p;saveCfg();alert("Target disimpan.")};
+ $("#ts").onclick=()=>{const c=+$("#tc").value,v=+$("#tv").value,p=+$("#tp").value;if(c<1||v<1||p<0)return alert("Target tidak valid.");T.call=c;T.visit=v;T.pagu=p;alert("Target disimpan.")};
  document.querySelectorAll("[data-sp]").forEach(b=>b.onclick=()=>{const i=+b.dataset.sp,v=document.querySelector(`[data-pi="${i}"]`).value;if(!/^\d{4,6}$/.test(v))return alert("PIN harus 4–6 angka.");setPin(MEM[i],v);alert("PIN "+MEM[i]+" disimpan.")});
- document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{const i=+b.dataset.del;if(MEM.length<2)return alert("Minimal 1 anggota.");if(confirm("Hapus "+MEM[i]+" dari daftar anggota?")){MEM.splice(i,1);saveCfg();render()}});
- $("#aa").onclick=()=>{const n=$("#an").value.trim(),p=$("#ap").value;if(!n||n===ADM||MEM.includes(n))return alert("Nama kosong atau sudah dipakai.");if(!/^\d{4,6}$/.test(p))return alert("PIN harus 4–6 angka.");MEM.push(n);setPin(n,p);saveCfg();render()}}
+ document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{const i=+b.dataset.del;if(MEM.length<2)return alert("Minimal 1 anggota.");if(confirm("Hapus "+MEM[i]+" dari daftar anggota?")){MEM.splice(i,1);render()}});
+ $("#aa").onclick=()=>{const n=$("#an").value.trim(),p=$("#ap").value;if(!n||n===ADM||MEM.includes(n))return alert("Nama kosong atau sudah dipakai.");if(!/^\d{4,6}$/.test(p))return alert("PIN harus 4–6 angka.");MEM.push(n);setPin(n,p);render()}}
 
 function render(){
  $("#hl").innerHTML=logoHtml(34);$("#wm").innerHTML=logoHtml(300);$("#ft").innerHTML=`<span class="fl">${logoHtml(26,1)}</span><span>© Laznas Yakesma · Aktivitas Sales</span>`;
  const on=!!st.user;$("#hd").style.display=on?"flex":"none";if(on)$("#who").textContent="👤 "+st.user;
  if(!on)renderLogin();else if(st.user===ADM)renderAdmin();else renderMember();
 }
-render();
+
+// Ambil data konfigurasi dari Firestore sebelum render pertama
+db.collection("sales_config").doc("main").get().then(doc=>{
+  if(doc.exists){
+    const d=doc.data();
+    if(d.members) MEM.splice(0, MEM.length, ...d.members);
+    if(d.target) Object.assign(T, d.target);
+  }
+  render();
+}).catch(()=>{render();});
 </script>
 </body>
 </html>
