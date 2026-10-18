@@ -7,6 +7,21 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script>
+  // Konfigurasi Firebase Anda
+  const firebaseConfig = {
+    apiKey: "AIzaSyBxZV3ndLBgBUFbGfAKsBzzNwNULecAnpw",
+    authDomain: "salesforces-99e1a.firebaseapp.com",
+    projectId: "salesforces-99e1a",
+    storageBucket: "salesforces-99e1a.firebasestorage.app",
+    messagingSenderId: "557795182418",
+    appId: "1:557795182418:web:e13252158c3ace98d79c8b"
+  };
+
+  // Inisialisasi Firebase & Firestore
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+</script>
 <style>
 :root{--bg:#f5f6f8;--card:#fff;--tx:#1d2330;--mu:#667085;--bd:#dfe3ea;--pr:#1f6feb;--ok:#12a150;--wr:#d97706;--rd:#e5484d}
 @media(prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--tx:#e8ebf1;--mu:#98a2b3;--bd:#2c3340;--pr:#5b9bff;--ok:#3ccf7a;--wr:#f0a43a;--rd:#ff6b6b}}
