@@ -97,6 +97,8 @@ const db = firebase.firestore();
 const ADM="Admin/Manager",JENIS=["call","ekspansi","probing","presentasi","closing","maintenance"],N=13;
 const DM=["M. Izzat","Vacant Retail","Dwi Prakoso","Azmi Hanif","Kevin"];
 let cfg={members:DM.slice(),target:{call:200,visit:60,pagu:300000}};
+const MEM=cfg.members,T=cfg.target;
+
 let S={};
 let P={};
 const DEF={"M. Izzat":"1111","Vacant Retail":"2222","Dwi Prakoso":"3333","Azmi Hanif":"4444","Kevin":"5555",[ADM]:"9999"};
@@ -111,8 +113,6 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const rp=n=>"Rp "+Math.round(n).toLocaleString("id-ID");
 const blank=()=>({nama:"",alamat:"",call:0,visit:0,jenis:"call",ket:"",kmA:0,kmB:0,foto:false});
-
-const MEM=cfg.members,T=cfg.target;
 
 // Sinkronisasi data Firestore per tanggal & member
 const day=(m,d)=>{
@@ -241,15 +241,12 @@ $("#file").onchange=e=>{
  r.readAsText(f);
 };
 
-/* Logo & Tema Yakesma dengan fallback SVG publik agar tidak patah */
-const LOGO="https://raw.githubusercontent.com/uwaisysultan-ux/sales_forces-indra/main/logo-yakesma.png";
-const ICON="https://raw.githubusercontent.com/uwaisysultan-ux/sales_forces-indra/main/icon-yakesma.png";
-const QUOTE="Sales adalah proses. Setiap proses dapat diukur. Dan apa yang dapat diukur, dapat ditingkatkan (improved).";
+/* Logo & Tema Yakesma dengan SVG bawaan agar pasti muncul */
 const logoHtml=(h,full)=>{
-  const u=full?LOGO:ICON;
-  return `<img src="${u}" alt="Laznas Yakesma" height="${h}" style="object-fit:contain" onerror="this.onerror=null;this.src='data:image/svg+xml;utf8,<svg viewBox=\\'0 0 64 64\\' width=\\'${h}\\' height=\\'${h}\\' xmlns=\\'http://www.w3.org/2000/svg\\'><rect width=\\'64\\' height=\\'64\\' rx=\\'16\\' fill=\\'%231f613e\\'/><path d=\\'M18 17l14 18 14-18\\' fill=\\'none\\' stroke=\\'%23fff\\' stroke-width=\\'7\\' stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\'/><path d=\\'M32 35v15\\' stroke=\\'%23fff\\' stroke-width=\\'7\\' stroke-linecap=\\'round\\'/><circle cx=\\'48\\' cy=\\'14\\' r=\\'5\\' fill=\\'%23f9c80b\\'/></svg>';">`;
+  return `<svg viewBox="0 0 64 64" width="${h}" height="${h}" role="img" aria-label="Yakesma"><defs><linearGradient id="yg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1f613e"/><stop offset="1" stop-color="#27993c"/></linearGradient></defs><rect width="64" height="64" rx="16" fill="url(#yg)"/><path d="M18 17l14 18 14-18" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M32 35v15" stroke="#fff" stroke-width="7" stroke-linecap="round"/><circle cx="48" cy="14" r="5" fill="#f9c80b"/></svg>`;
 };
 const hero=(t,sub)=>`<section class="hero"><div class="hw">${logoHtml(48)}</div><div class="ht"><div class="hs">${sub}</div><h2>${t}</h2></div><blockquote>${QUOTE}</blockquote></section>`;
+const QUOTE="Sales adalah proses. Setiap proses dapat diukur. Dan apa yang dapat diukur, dapat ditingkatkan (improved).";
 
 function renderLogin(){
  $("#app").innerHTML=`<div class="login"><div class="lgo">${logoHtml(72,1)}</div><h1>Aktivitas Sales</h1><div class="org">Laznas Yakesma</div><blockquote class="q2">${QUOTE}</blockquote><div class="card"><h2 style="margin-top:0">Masuk</h2><label>Nama</label><select id="ln">${[...MEM,ADM].map(x=>`<option>${esc(x)}</option>`).join("")}</select><label style="margin-top:10px">PIN</label><input type="password" id="lp" inputmode="numeric" maxlength="6" autocomplete="off"><div id="le" style="color:var(--wr);min-height:20px;margin:6px 0"></div><button class="p" id="lg" style="width:100%">Masuk</button></div></div>`;
@@ -357,15 +354,17 @@ function render(){
  if(!on)renderLogin();else if(st.user===ADM)renderAdmin();else renderMember();
 }
 
-// Ambil data konfigurasi dari Firestore sebelum render pertama
+// Langsung panggil render() awal tanpa menunggu query firestore
+render();
+
 db.collection("sales_config").doc("main").get().then(doc=>{
   if(doc.exists){
     const d=doc.data();
     if(d.members) MEM.splice(0, MEM.length, ...d.members);
     if(d.target) Object.assign(T, d.target);
+    render();
   }
-  render();
-}).catch(()=>{render();});
+}).catch(()=>{});
 </script>
 </body>
 </html>
