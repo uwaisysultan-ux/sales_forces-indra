@@ -74,6 +74,8 @@ footer{text-align:center;color:var(--mu);font-size:12px;padding:22px 10px 28px;d
 .kmc{flex:1}.kmc button{width:auto;min-width:0;flex:0 0 auto;padding:9px 10px}.kmc input{flex:1 1 auto;min-width:0;width:auto}
 .kmres{margin-top:10px;line-height:1.9}.kmres b{font-size:16px}.rpv{color:var(--ok)}
 .svrow{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}.svrow button{min-width:160px}
+.ent{display:flex;gap:8px;justify-content:space-between;align-items:flex-start;padding:10px 0;border-top:1px solid var(--bd)}.ent:first-child{border-top:0;padding-top:0}
+.entb{min-width:0}.enta{display:flex;gap:6px;flex-shrink:0}.enta button{padding:6px 10px;width:auto}
 </style>
 </head>
 <body>
@@ -125,8 +127,12 @@ let st={user:su,date:today(),tab:"dash",per:"w",sel:MEM[0],mm:today().slice(0,7)
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const rp=n=>"Rp "+Math.round(n).toLocaleString("id-ID");
-const blank=()=>({nama:"",alamat:"",call:0,visit:0,jenis:"call",ket:"",kmA:0,kmB:0,foto:false});
-const day=(m,d)=>{S[m]=S[m]||{};if(!S[m][d])S[m][d]=Array.from({length:N},blank);return S[m][d]};
+const blank=()=>({nama:"",alamat:"",call:0,visit:0,closing:0,donasi:0,jenis:"call",ket:"",kmA:0,kmB:0,foto:false});
+const nb=e=>!!(((e.nama||"")+"").trim()||+e.call||+e.visit||+e.closing||+e.donasi||((e.ket||"")+"").trim()||+e.kmA||+e.kmB);
+const norm=r=>(Array.isArray(r)?r:[]).map((e,i)=>({...blank(),...e,id:e.id||String(i)})).filter(nb);
+const newId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+let draft=null,flash=null;const getDraft=()=>draft||(draft={...blank(),id:newId()});
+const day=(m,d)=>{S[m]=S[m]||{};if(!S[m][d])S[m][d]=[];return S[m][d]};
 const km=e=>e.kmB>e.kmA&&e.kmA>=0?e.kmB-e.kmA:0;
 const bbm=k=>k/12*10000;
 const pct=(a,b)=>b?Math.min(100,Math.round(a/b*100)):0;
@@ -137,21 +143,21 @@ function rng(per,d){const dt=new Date(d+"T00:00:00"),f=x=>new Date(x-x.getTimezo
  if(per==="w"){const a=new Date(dt);a.setDate(dt.getDate()-(dt.getDay()+6)%7);const b=new Date(a);b.setDate(a.getDate()+6);return[f(a),f(b)]}
  return[d.slice(0,7)+"-01",d.slice(0,7)+"-31"]}
 const tg=per=>{const f=per==="m"?1:per==="w"?4:20;return{call:Math.round(T.call/f),visit:Math.round(T.visit/f)}};
-function stats(m,s,e){let c=0,v=0,k=0;for(const d in(S[m]||{}))if(d>=s&&d<=e)for(const x of S[m][d]){c+=+x.call||0;v+=+x.visit||0;k+=km(x)}
- return{c,v,k,raw:bbm(k),cl:Math.min(bbm(k),T.pagu)}}
+function stats(m,s,e){let c=0,v=0,k=0,cs=0,dn=0;for(const d in(S[m]||{}))if(d>=s&&d<=e)for(const x of S[m][d]){c+=+x.call||0;v+=+x.visit||0;cs+=+x.closing||0;dn+=+x.donasi||0;k+=km(x)}
+ return{c,v,k,cs,dn,raw:bbm(k),cl:Math.min(bbm(k),T.pagu)}}
 function agg(m,s,e){const mp={};
  for(const d of Object.keys(S[m]||{}).sort())if(d>=s&&d<=e)for(const x of S[m][d]){
-  const nm=x.nama.trim();if(!nm&&!x.call&&!x.visit&&!x.ket&&!km(x))continue;
-  const o=mp[(nm||"(tanpa nama)").toLowerCase()]=mp[(nm||"(tanpa nama)").toLowerCase()]||{nama:nm||"(tanpa nama)",c:0,v:0,k:0};
-  o.c+=+x.call||0;o.v+=+x.visit||0;o.k+=km(x)}
+  if(!nb(x))continue;const nm=(x.nama||"").trim()||"(tanpa nama)",key=nm.toLowerCase();
+  const o=mp[key]=mp[key]||{nama:nm,c:0,v:0,cs:0,dn:0,k:0};
+  o.c+=+x.call||0;o.v+=+x.visit||0;o.cs+=+x.closing||0;o.dn+=+x.donasi||0;o.k+=km(x)}
  return Object.values(mp)}
 function aggD(m,s,e){const mp={};
- for(const d of Object.keys(S[m]||{}).sort())if(d>=s&&d<=e)S[m][d].forEach((x,i)=>{
-  const nm=x.nama.trim();if(!nm&&!x.call&&!x.visit&&!x.ket&&!km(x))return;
-  const key=(nm||"(tanpa nama)").toLowerCase()+"|"+d,o=mp[key]=mp[key]||{nama:nm||"(tanpa nama)",alamat:x.alamat,d,c:0,v:0,k:0,l:[],ph:[]};
-  o.c+=+x.call||0;o.v+=+x.visit||0;o.k+=km(x);if(!o.alamat)o.alamat=x.alamat;
-  if(x.ket||x.call||x.visit)o.l.push(x.jenis+(x.ket?": "+x.ket:""));
-  if(x.foto)o.ph.push(m+"|"+d+"|"+i)});
+ for(const d of Object.keys(S[m]||{}).sort())if(d>=s&&d<=e)S[m][d].forEach(x=>{
+  if(!nb(x))return;const nm=(x.nama||"").trim()||"(tanpa nama)";
+  const key=nm.toLowerCase()+"|"+d,o=mp[key]=mp[key]||{nama:nm,alamat:x.alamat,d,c:0,v:0,cs:0,dn:0,k:0,l:[],ph:[]};
+  o.c+=+x.call||0;o.v+=+x.visit||0;o.cs+=+x.closing||0;o.dn+=+x.donasi||0;o.k+=km(x);if(!o.alamat)o.alamat=x.alamat;
+  if(x.ket||x.call||x.visit||x.closing||x.donasi)o.l.push(x.jenis+(x.ket?": "+x.ket:""));
+  if(x.foto)o.ph.push(m+"|"+d+"|"+x.id)});
  const lo=o=>o.nama.toLowerCase();
  return Object.values(mp).sort((p,q)=>lo(p)<lo(q)?-1:lo(p)>lo(q)?1:p.d<q.d?-1:1)}
 const fd=d=>d.slice(8)+"/"+d.slice(5,7)+"/"+d.slice(0,4);
@@ -195,15 +201,15 @@ function xlsx(sh){const R="http://schemas.openxmlformats.org/officeDocument/2006
 async function exportXlsx(){
  if(!st.user)return;
  const adm=st.user===ADM,ms=adm?MEM:[st.user],per=adm?st.per:"m",[s,e]=rng(per,st.date),t=adm?tg(per):{call:T.call,visit:T.visit};
- if(adm&&db){try{const sn=await db.collection("days").where("d",">=",s).where("d","<=",e).get();sn.forEach(q=>{const x=q.data();if(!timers[q.id])(S[x.m]=S[x.m]||{})[x.d]=x.rows})}catch(x){}}
+ if(adm&&db){try{const sn=await db.collection("days").where("d",">=",s).where("d","<=",e).get();sn.forEach(q=>{const x=q.data();if(!timers[q.id])(S[x.m]=S[x.m]||{})[x.d]=norm(x.rows)})}catch(x){}}
  const lbl=per==="m"?st.date.slice(0,7):per==="d"?s:s+"_sd_"+e;
- const A=[["Anggota","Call","Target call","% Call","Visit","Target visit","% Visit","Rata-rata %","Total KM","Klaim BBM (Rp)"]],
- B=[["Anggota","Mitra","Alamat","Tanggal","Call","Visit","KM","Klaim BBM (Rp)","Penjelasan aktivitas"]],
- C=[["Anggota","Tanggal","Mitra","Alamat","Call","Visit","Jenis aktivitas","Penjelasan","KM awal","KM akhir","Total KM","Klaim BBM (Rp)"]];
+ const A=[["Anggota","Call","Target call","% Call","Visit","Target visit","% Visit","Closing","Donasi (Rp)","Rata-rata %","Total KM","Klaim BBM (Rp)"]],
+ B=[["Anggota","Mitra","Alamat","Tanggal","Call","Visit","Closing","Donasi (Rp)","KM","Klaim BBM (Rp)","Penjelasan aktivitas"]],
+ C=[["Anggota","Tanggal","Mitra","Alamat","Call","Visit","Closing","Donasi (Rp)","Jenis aktivitas","Penjelasan","KM awal","KM akhir","Total KM","Klaim BBM (Rp)"]];
  for(const m of ms){const x=stats(m,s,e),pc=pct(x.c,t.call),pv=pct(x.v,t.visit);
-  A.push([m,x.c,t.call,pc,x.v,t.visit,pv,Math.round((pc+pv)/2),x.k,Math.round(per==="m"?x.cl:x.raw)]);
-  aggD(m,s,e).forEach(o=>B.push([m,o.nama,o.alamat||"",fd(o.d),o.c,o.v,o.k,Math.round(bbm(o.k)),o.l.join(" | ")]));
-  for(const d of Object.keys(S[m]||{}).sort())if(d>=s&&d<=e)S[m][d].forEach(z=>{if(z.nama.trim()||z.call||z.visit||z.ket)C.push([m,fd(d),z.nama,z.alamat,+z.call||0,+z.visit||0,z.jenis,z.ket,+z.kmA||0,+z.kmB||0,km(z),Math.round(bbm(km(z)))])})}
+  A.push([m,x.c,t.call,pc,x.v,t.visit,pv,x.cs,x.dn,Math.round((pc+pv)/2),x.k,Math.round(per==="m"?x.cl:x.raw)]);
+  aggD(m,s,e).forEach(o=>B.push([m,o.nama,o.alamat||"",fd(o.d),o.c,o.v,o.cs,o.dn,o.k,Math.round(bbm(o.k)),o.l.join(" | ")]));
+  for(const d of Object.keys(S[m]||{}).sort())if(d>=s&&d<=e)S[m][d].forEach(z=>{if(nb(z))C.push([m,fd(d),z.nama,z.alamat,+z.call||0,+z.visit||0,+z.closing||0,+z.donasi||0,z.jenis,z.ket,+z.kmA||0,+z.kmB||0,km(z),Math.round(bbm(km(z)))])})}
  const url=URL.createObjectURL(xlsx([["Rekap Anggota",A],["Rekap Mitra",B],["Detail Aktivitas",C]])),l=document.createElement("a");
  l.href=url;l.download="rekap-sales-"+lbl+".xlsx";document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(url),5000)}
 
@@ -215,67 +221,84 @@ const hero=(t,sub)=>`<section class="hero"><div class="hw">${logoHtml(48)}</div>
 /* ---------- Login & PIN ---------- */
 function renderLogin(){
  $("#app").innerHTML=`<div class="login"><div class="lgo">${logoHtml(100)}</div><h1>Aktivitas Sales</h1><blockquote class="q2">${QUOTE}</blockquote><div class="card"><h2 style="margin-top:0">Masuk</h2><label>Nama</label><select id="ln">${[...MEM,ADM].map(x=>`<option>${esc(x)}</option>`).join("")}</select><label style="margin-top:10px">PIN</label><input type="password" id="lp" inputmode="numeric" maxlength="6" autocomplete="off"><div id="le" style="color:var(--wr);min-height:20px;margin:6px 0"></div><button class="p" id="lg" style="width:100%">Masuk</button></div></div>`;
- const go=()=>{const n=$("#ln").value;if($("#lp").value===getPin(n)){st.user=n;st.sel=MEM[0];try{sessionStorage.setItem("u",n)}catch(e){}render()}else{$("#le").textContent="PIN salah.";$("#lp").value=""}};
+ const go=()=>{const n=$("#ln").value;if($("#lp").value===getPin(n)){st.user=n;st.sel=MEM[0];draft=null;flash=null;try{sessionStorage.setItem("u",n)}catch(e){}render()}else{$("#le").textContent="PIN salah.";$("#lp").value=""}};
  $("#lg").onclick=go;$("#lp").onkeydown=e=>{if(e.key==="Enter")go()}}
 $("#pin").onclick=()=>{const o=prompt("Masukkan PIN lama:");if(o===null)return;if(o!==getPin(st.user))return alert("PIN lama salah.");
  const n=prompt("PIN baru (4–6 angka):");if(n===null)return;if(!/^\d{4,6}$/.test(n))return alert("PIN harus 4–6 angka.");setPin(st.user,n);alert("PIN berhasil diganti.")};
-$("#out").onclick=()=>{flushAll();st.user=null;S={};subKey="";if(unsub){unsub();unsub=null}try{sessionStorage.removeItem("u")}catch(e){}render()};
+$("#out").onclick=()=>{flushAll();st.user=null;draft=null;flash=null;S={};subKey="";if(unsub){unsub();unsub=null}try{sessionStorage.removeItem("u")}catch(e){}render()};
 
 /* ---------- Rekap & form input ---------- */
 function kpiHtml(m,d){const[s,e]=rng("m",d),x=stats(m,s,e),ym=d.slice(0,7);
  return`<div class="card"><b>Capaian vs target · ${ym}</b><div style="margin-top:10px">${bar("Call",x.c,T.call)}${bar("Visit",x.v,T.visit)}</div></div>
+ <div class="card"><b>Closing & donasi · ${ym}</b><div class="grid" style="margin-top:8px"><div><div class="mu">Closing</div><div class="big">${x.cs}</div></div><div><div class="mu">Total donasi</div><div class="big" style="color:var(--ok)">${rp(x.dn)}</div></div></div></div>
  <div class="card"><div class="mu">Total klaim BBM bulan ${ym}</div><div class="big">${rp(x.cl)}</div>
  <div class="mu">${x.k} KM ÷ 12 × Rp 10.000 = ${rp(x.raw)}</div><div class="mu">Pagu maksimal ${rp(T.pagu)}</div>
  <div class="bar"><i style="width:${pct(x.cl,T.pagu)}%"></i></div></div>`}
 function recap(m,date){const[s,e]=rng("m",date),ym=date.slice(0,7);
- const tb=L=>{let c=0,v=0,k=0;const r=L.map(o=>{c+=o.c;v+=o.v;k+=o.k;return`<tr><td>${esc(o.nama)}</td><td class="r">${o.c}</td><td class="r">${o.v}</td><td class="r">${o.k}</td><td class="r">${rp(bbm(o.k))}</td></tr>`}).join("")||`<tr><td colspan="5" class="mu">Belum ada data.</td></tr>`;
-  return`<table><tr><th>Mitra</th><th class="r">Call</th><th class="r">Visit</th><th class="r">KM</th><th class="r">Klaim BBM</th></tr>${r}<tr><th>Total</th><th class="r">${c}</th><th class="r">${v}</th><th class="r">${k}</th><th class="r">${rp(bbm(k))}</th></tr></table>`};
+ const tb=L=>{let c=0,v=0,cs=0,dn=0,k=0;const r=L.map(o=>{c+=o.c;v+=o.v;cs+=o.cs;dn+=o.dn;k+=o.k;return`<tr><td>${esc(o.nama)}</td><td class="r">${o.c}</td><td class="r">${o.v}</td><td class="r">${o.cs}</td><td class="r">${rp(o.dn)}</td><td class="r">${o.k}</td><td class="r">${rp(bbm(o.k))}</td></tr>`}).join("")||`<tr><td colspan="7" class="mu">Belum ada data.</td></tr>`;
+  return`<table><tr><th>Mitra</th><th class="r">Call</th><th class="r">Visit</th><th class="r">Closing</th><th class="r">Donasi</th><th class="r">KM</th><th class="r">Klaim BBM</th></tr>${r}<tr><th>Total</th><th class="r">${c}</th><th class="r">${v}</th><th class="r">${cs}</th><th class="r">${rp(dn)}</th><th class="r">${k}</th><th class="r">${rp(bbm(k))}</th></tr></table>`};
  return`<h2>Rekap harian (${date})</h2><div class="card tw">${tb(agg(m,date,date))}</div>
  <h2>Akumulasi bulan ${ym}</h2><div class="card tw">${tb(agg(m,s,e))}<div class="mu" style="margin-top:8px">Klaim BBM = total KM ÷ 12 × Rp 10.000. Total klaim bulan ini setelah pagu ${rp(T.pagu)}: <b>${rp(stats(m,s,e).cl)}</b></div></div>`}
-const counter=(i,k,v)=>`<div class="ct"><button data-i="${i}" data-k="${k}" data-d="-1">−</button><input type="number" min="0" data-i="${i}" data-k="${k}" value="${v}"><button data-i="${i}" data-k="${k}" data-d="1">+</button></div>`;
-const kmc=(i,k,v)=>`<div class="ct kmc"><button data-i="${i}" data-k="${k}" data-d="-10">−10</button><button data-i="${i}" data-k="${k}" data-d="-1">−</button><input type="number" min="0" inputmode="numeric" data-i="${i}" data-k="${k}" value="${v}"><button data-i="${i}" data-k="${k}" data-d="1">+</button><button data-i="${i}" data-k="${k}" data-d="10">+10</button></div>`;
-const card=(e,i)=>`<div class="card"><div class="top"><b>Mitra ${i+1}</b></div>
+const cnt=(k,v)=>`<div class="ct"><button data-k="${k}" data-d="-1">−</button><input type="number" min="0" inputmode="numeric" onfocus="this.select()" data-k="${k}" value="${v}"><button data-k="${k}" data-d="1">+</button></div>`;
+const kmc=(k,v)=>`<div class="ct kmc"><button data-k="${k}" data-d="-10">−10</button><button data-k="${k}" data-d="-1">−</button><input type="number" min="0" inputmode="numeric" onfocus="this.select()" data-k="${k}" value="${v}"><button data-k="${k}" data-d="1">+</button><button data-k="${k}" data-d="10">+10</button></div>`;
+const donc=v=>`<div class="ct kmc"><button data-k="donasi" data-d="-50000">−50rb</button><input type="number" min="0" inputmode="numeric" onfocus="this.select()" data-k="donasi" value="${v}"><button data-k="donasi" data-d="50000">+50rb</button><button data-k="donasi" data-d="100000">+100rb</button></div>`;
+const entRow=(e,i)=>`<div class="ent"><div class="entb"><b>${i+1}. ${esc(e.nama)||"(tanpa nama)"}</b><div class="mu">${esc(e.alamat)}</div><div class="mu">Call ${+e.call||0} · Visit ${+e.visit||0} · Closing ${+e.closing||0} · Donasi ${rp(+e.donasi||0)} · KM ${km(e)} (${rp(bbm(km(e)))})${e.foto?" · 📷":""}</div>${e.ket?`<div class="mu">${esc(e.jenis)}: ${esc(e.ket)}</div>`:""}</div><div class="enta"><button data-edit="${esc(e.id)}">Ubah</button><button class="d" data-del="${esc(e.id)}">Hapus</button></div></div>`;
+const formPart=(m,post)=>{const L=day(m,st.date),d=getDraft(),ed=L.some(e=>e.id===d.id),fl=flash;flash=null;
+ return`<div class="card"><label>Tanggal</label><input type="date" id="dt" value="${st.date}" style="max-width:200px"><div class="mu" style="margin-top:6px">Isi satu mitra, tekan Simpan, lalu form otomatis kosong untuk mitra berikutnya.</div></div>
+ <div class="card" id="draftcard"><div class="top"><b>${ed?"Ubah data mitra":"Mitra ke-"+(L.length+1)}</b></div>
+ <div id="fl" style="min-height:20px;margin-bottom:6px;font-weight:600;color:${fl&&fl.ok?"var(--ok)":"var(--rd)"}">${fl?esc(fl.t):""}</div>
  <div class="grid">
-  <div><label>Nama mitra</label><input data-i="${i}" data-k="nama" value="${esc(e.nama)}"></div>
-  <div><label>Alamat mitra</label><input data-i="${i}" data-k="alamat" value="${esc(e.alamat)}"></div>
-  <div><label>Call (x)</label>${counter(i,"call",e.call)}</div>
-  <div><label>Visit (x)</label>${counter(i,"visit",e.visit)}</div>
-  <div><label>Keterangan aktivitas</label><select data-i="${i}" data-k="jenis">${JENIS.map(j=>`<option ${j==e.jenis?"selected":""}>${j}</option>`).join("")}</select></div>
+  <div><label>Nama mitra</label><input data-k="nama" value="${esc(d.nama)}"></div>
+  <div><label>Alamat mitra</label><input data-k="alamat" value="${esc(d.alamat)}"></div>
+  <div><label>Call (x)</label>${cnt("call",d.call)}</div>
+  <div><label>Visit (x)</label>${cnt("visit",d.visit)}</div>
+  <div><label>Closing (x)</label>${cnt("closing",d.closing)}</div>
+  <div><label>Keterangan aktivitas</label><select data-k="jenis">${JENIS.map(j=>`<option ${j==d.jenis?"selected":""}>${j}</option>`).join("")}</select></div>
  </div>
+ <div class="kmbox"><b>Donasi</b>
+  <div class="kmrow"><span>Nominal donasi (Rp)</span>${donc(d.donasi)}</div>
+  <div class="kmres">Donasi: <b id="dnv" class="rpv">${rp(+d.donasi||0)}</b></div></div>
  <div class="kmbox"><b>Klaim BBM (visit)</b>
-  <div class="kmrow"><span>KM awal</span>${kmc(i,"kmA",e.kmA)}</div>
-  <div class="kmrow"><span>KM akhir</span>${kmc(i,"kmB",e.kmB)}</div>
-  <div class="kmres">Total KM: <b id="t${i}">${km(e)}</b> km <span class="mu">(KM akhir − KM awal)</span><br>Klaim BBM: <b id="r${i}" class="rpv">${rp(bbm(km(e)))}</b> <span class="mu">(total KM ÷ 12 × Rp 10.000)</span></div></div>
- <label style="margin-top:8px">Penjelasan aktivitas</label><textarea data-i="${i}" data-k="ket">${esc(e.ket)}</textarea>
- <label style="margin-top:8px">Foto aktivitas</label><input type="file" accept="image/*" data-up="${i}"><div id="ph${i}" style="margin-top:6px"></div>
- <div class="svrow"><button class="p" data-save="${i}">Simpan Mitra ${i+1}</button><span class="mu" id="sm${i}"></span></div></div>`;
-const formPart=(m,mid)=>`<div class="card"><label>Tanggal</label><input type="date" id="dt" value="${st.date}" style="max-width:200px"><div class="mu" style="margin-top:6px">Isi hingga ${N} mitra per hari. Data tersimpan otomatis; tekan Simpan di tiap mitra untuk memastikan.</div></div>${mid||""}<div id="rows">${day(m,st.date).map(card).join("")}</div>`;
+  <div class="kmrow"><span>KM awal</span>${kmc("kmA",d.kmA)}</div>
+  <div class="kmrow"><span>KM akhir</span>${kmc("kmB",d.kmB)}</div>
+  <div class="kmres">Total KM: <b id="t0">${km(d)}</b> km <span class="mu">(KM akhir − KM awal)</span><br>Klaim BBM: <b id="r0" class="rpv">${rp(bbm(km(d)))}</b> <span class="mu">(total KM ÷ 12 × Rp 10.000)</span></div></div>
+ <label style="margin-top:8px">Penjelasan aktivitas</label><textarea data-k="ket">${esc(d.ket)}</textarea>
+ <label style="margin-top:8px">Foto aktivitas</label><input type="file" accept="image/*" data-up="1"><div id="ph0" style="margin-top:6px"></div>
+ <div class="svrow"><button class="p" data-act="save">${ed?"Simpan Perubahan":"Simpan & Mitra Berikutnya"}</button>${ed?'<button data-act="cancel">Batal</button>':""}</div></div>
+ <h2>Mitra tersimpan hari ini (${L.length})</h2><div class="card" id="saved">${L.length?L.map(entRow).join(""):'<div class="mu">Belum ada mitra tersimpan pada tanggal ini.</div>'}</div>${post||""}`};
 function bindForm(m){
- $("#dt").onchange=e=>{st.date=e.target.value||today();render()};
- const NUM=["call","visit","kmA","kmB"],root=$("#rows");
- let rcT;const refreshRc=()=>{const a=$("#kpi"),b=$("#rc");if(a)a.innerHTML=kpiHtml(m,st.date);if(b)b.innerHTML=recap(m,st.date)};
- const upd=(i,k,v,imm)=>{const e=day(m,st.date)[i];e[k]=NUM.includes(k)?Math.max(0,+v||0):v;save(m,st.date);
-  const t=$("#t"+i),r=$("#r"+i),ss=$("#sm"+i);if(t)t.textContent=km(e);if(r)r.textContent=rp(bbm(km(e)));if(ss)ss.textContent="";
-  if(imm)refreshRc();else{clearTimeout(rcT);rcT=setTimeout(refreshRc,900)}};
- root.addEventListener("input",ev=>{const t=ev.target;if(t.dataset.k)upd(+t.dataset.i,t.dataset.k,t.value,false)});
+ $("#dt").onchange=e=>{st.date=e.target.value||today();draft=null;render()};
+ const root=$("#draftcard"),NUM=["call","visit","closing","donasi","kmA","kmB"];
+ const calc=()=>{const t=$("#t0"),r=$("#r0"),d=$("#dnv");if(t)t.textContent=km(draft);if(r)r.textContent=rp(bbm(km(draft)));if(d)d.textContent=rp(+draft.donasi||0)};
+ const upd=(k,v)=>{draft[k]=NUM.includes(k)?Math.max(0,+v||0):v;calc()};
+ const fl=(t,ok)=>{const e=$("#fl");if(e){e.textContent=t;e.style.color=ok?"var(--ok)":"var(--rd)"}};
+ root.addEventListener("input",ev=>{const t=ev.target;if(t.dataset.k)upd(t.dataset.k,t.value)});
  root.addEventListener("click",ev=>{const b=ev.target.closest("button[data-d]");if(!b)return;
-  const i=+b.dataset.i,k=b.dataset.k,e=day(m,st.date)[i];let cur=+e[k]||0;if(k==="kmB"&&cur<(+e.kmA||0))cur=+e.kmA||0;
-  upd(i,k,cur+ +b.dataset.d,true);
-  b.parentNode.querySelector("input").value=day(m,st.date)[i][k]});
- root.addEventListener("click",async ev=>{const b=ev.target.closest("button[data-save]");if(!b)return;
-  const i=+b.dataset.save,ss=$("#sm"+i),k=dkey(m,st.date);ss.style.color="";ss.textContent="Menyimpan…";b.disabled=true;
-  if(!timers[k])timers[k]={m,d:st.date,t:0};
+  const k=b.dataset.k;let cur=+draft[k]||0;if(k==="kmB"&&cur<(+draft.kmA||0))cur=+draft.kmA||0;
+  upd(k,cur+ +b.dataset.d);b.closest(".ct").querySelector("input").value=draft[k]});
+ const key=()=>m+"|"+st.date+"|"+draft.id,showPh=src=>{const h=$("#ph0");if(h)h.innerHTML=src?`<img class="th" data-zoom src="${src}"><button class="d" data-rm="1">Hapus foto</button>`:""};
+ root.addEventListener("change",async ev=>{const t=ev.target;if(!t.dataset.up)return;const f=t.files[0];if(!f)return;
+  try{const d=await shrink(f);await pset(key(),d);draft.foto=true;showPh(d)}catch(x){alert("Foto gagal disimpan.")}t.value=""});
+ root.addEventListener("click",async ev=>{const b=ev.target.closest("button[data-rm]");if(!b)return;await pdel(key()).catch(()=>0);draft.foto=false;showPh("")});
+ root.addEventListener("click",async ev=>{const b=ev.target.closest("button[data-act]");if(!b)return;
+  if(b.dataset.act==="cancel"){draft=null;render();return}
+  if(!(draft.nama||"").trim()){fl("Nama mitra wajib diisi.",false);return}
+  b.disabled=true;fl("Menyimpan…",true);
+  const L=day(m,st.date),ent={...draft,nama:draft.nama.trim(),alamat:(draft.alamat||"").trim(),ket:(draft.ket||"").trim()},ix=L.findIndex(e=>e.id===ent.id);
+  if(ix>=0)L[ix]=ent;else L.push(ent);
+  const k=dkey(m,st.date);timers[k]={m,d:st.date,t:0};
   const ok=await Promise.race([flush(k),new Promise(r=>setTimeout(()=>r(false),12000))]);
-  b.disabled=false;refreshRc();ss.style.color=ok?"var(--ok)":"var(--rd)";
-  ss.textContent=ok?"✓ Tersimpan & terekap · "+new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}):"✗ Belum tersimpan. Periksa koneksi internet / aturan Firestore."});
- root.addEventListener("focusout",()=>flushAll());
- const key=i=>m+"|"+st.date+"|"+i,showPh=(i,src)=>{const h=$("#ph"+i);if(h)h.innerHTML=src?`<img class="th" data-zoom src="${src}"><button class="d" data-rm="${i}">Hapus foto</button>`:""};
- root.addEventListener("change",async ev=>{const t=ev.target;if(!t.dataset.up)return;const i=+t.dataset.up,f=t.files[0];if(!f)return;
-  try{const d=await shrink(f);await pset(key(i),d);day(m,st.date)[i].foto=true;save(m,st.date);showPh(i,d)}catch(x){alert("Foto gagal disimpan.")}t.value=""});
- root.addEventListener("click",async ev=>{const b=ev.target.closest("button[data-rm]");if(!b)return;const i=+b.dataset.rm;await pdel(key(i)).catch(()=>0);day(m,st.date)[i].foto=false;save(m,st.date);showPh(i,"")});
- day(m,st.date).forEach((e,i)=>{if(e.foto)pget(key(i)).then(v=>showPh(i,v))})}
+  if(ok){draft=null;flash={t:"✓ "+ent.nama+" tersimpan & terekap. Silakan input mitra berikutnya.",ok:true};render()}
+  else{b.disabled=false;fl("✗ Belum tersimpan di server. Periksa koneksi internet / aturan Firestore, lalu tekan Simpan lagi.",false)}});
+ $("#saved").addEventListener("click",async ev=>{const b=ev.target.closest("button");if(!b)return;const L=day(m,st.date);
+  if(b.dataset.edit){const e=L.find(x=>x.id===b.dataset.edit);if(e){draft={...e};render()}}
+  else if(b.dataset.del){const i=L.findIndex(x=>x.id===b.dataset.del);if(i<0||!confirm("Hapus mitra "+(L[i].nama||"ini")+"?"))return;
+   const e=L.splice(i,1)[0];if(e.foto)pdel(m+"|"+st.date+"|"+e.id).catch(()=>0);if(draft&&draft.id===e.id)draft=null;
+   const k=dkey(m,st.date);timers[k]={m,d:st.date,t:0};await flush(k);render()}});
+ if(draft.foto)pget(key()).then(v=>showPh(v));
+ if(!root.dataset.s&&document.getElementById("fl")&&document.getElementById("fl").textContent.startsWith("✓"))root.scrollIntoView({block:"start"})}
 function renderMember(){const m=st.user;
- $("#app").innerHTML=hero("Halo, "+esc(m),"Aktivitas Sales · "+fd(today()))+`<div id="kpi">${kpiHtml(m,st.date)}</div>`+formPart(m,`<div id="rc">${recap(m,st.date)}</div>`);bindForm(m)}
+ $("#app").innerHTML=hero("Halo, "+esc(m),"Aktivitas Sales · "+fd(today()))+formPart(m,`<div id="kpi">${kpiHtml(m,st.date)}</div><div id="rc">${recap(m,st.date)}</div>`);bindForm(m)}
 
 /* ---------- Admin ---------- */
 function renderAdmin(){
@@ -288,33 +311,34 @@ const selOpts=(v,all)=>(all?`<option value="all" ${v==="all"?"selected":""}>Semu
 function tDash(el){
  const[s,e]=rng(st.per,st.date),t=tg(st.per),ym=st.date.slice(0,7),[ms,me]=rng("m",st.date);
  const rt=st.per==="m"?ym:st.per==="d"?s:s+" s/d "+e;
- let rows="",sum=0,bb=0;
- for(const m of MEM){const x=stats(m,s,e),pc=pct(x.c,t.call),pv=pct(x.v,t.visit),av=Math.round((pc+pv)/2);sum+=av;bb+=stats(m,ms,me).cl;
-  rows+=`<tr><td>${esc(m)}</td><td class="r">${x.c}/${t.call}</td><td class="r">${pc}%</td><td class="r">${x.v}/${t.visit}</td><td class="r">${pv}%</td><td class="r">${av}%</td><td class="r">${x.k}</td><td class="r">${rp(st.per==="m"?x.cl:x.raw)}</td></tr>`}
+ let rows="",sum=0,bb=0,tcs=0,tdn=0;
+ for(const m of MEM){const x=stats(m,s,e),pc=pct(x.c,t.call),pv=pct(x.v,t.visit),av=Math.round((pc+pv)/2);sum+=av;bb+=stats(m,ms,me).cl;tcs+=x.cs;tdn+=x.dn;
+  rows+=`<tr><td>${esc(m)}</td><td class="r">${x.c}/${t.call}</td><td class="r">${pc}%</td><td class="r">${x.v}/${t.visit}</td><td class="r">${pv}%</td><td class="r">${x.cs}</td><td class="r">${rp(x.dn)}</td><td class="r">${av}%</td><td class="r">${x.k}</td><td class="r">${rp(st.per==="m"?x.cl:x.raw)}</td></tr>`}
  const avg=MEM.length?Math.round(sum/MEM.length):0,L=aggD(st.sel,s,e);
  el.innerHTML=`<div class="tabs">${[["d","Harian"],["w","Mingguan"],["m","Bulanan"]].map(([k,l])=>`<button data-per="${k}" class="${st.per===k?"p":""}">${l}</button>`).join("")}</div>
  <input type="date" id="dd" value="${st.date}" style="max-width:200px;margin-bottom:12px">
  <div class="card"><b>Pencapaian Admin/Manager (rata-rata anggota)</b><div class="big">${avg}%</div><div class="mu">${rt} · target per anggota: call ${t.call}, visit ${t.visit}</div><div class="bar" style="height:12px"><i style="width:${avg}%;background:${col(avg)}"></i></div></div>
+ <div class="card"><b>Closing & donasi · ${rt}</b><div class="grid" style="margin-top:8px"><div><div class="mu">Total closing</div><div class="big">${tcs}</div></div><div><div class="mu">Total donasi</div><div class="big" style="color:var(--ok)">${rp(tdn)}</div></div></div></div>
  <div class="card"><b>Total klaim BBM bulan ${ym}</b><div class="big">${rp(bb)}</div><div class="mu">Per anggota: total KM ÷ 12 × Rp 10.000, maksimal ${rp(T.pagu)}</div></div>
- <h2>Rekap aktivitas per anggota</h2><div class="card tw"><table><tr><th>Anggota</th><th class="r">Call</th><th class="r">% Call</th><th class="r">Visit</th><th class="r">% Visit</th><th class="r">Rata-rata</th><th class="r">Total KM</th><th class="r">Klaim BBM</th></tr>${rows}</table>
+ <h2>Rekap aktivitas per anggota</h2><div class="card tw"><table><tr><th>Anggota</th><th class="r">Call</th><th class="r">% Call</th><th class="r">Visit</th><th class="r">% Visit</th><th class="r">Closing</th><th class="r">Donasi</th><th class="r">Rata-rata</th><th class="r">Total KM</th><th class="r">Klaim BBM</th></tr>${rows}</table>
  <div class="mu" style="margin-top:8px">Klaim BBM mode harian/mingguan = hitungan KM ÷ 12 × Rp 10.000; mode bulanan sudah dipotong pagu.</div></div>
  <h2>Rekap aktivitas per mitra · ${rt}</h2><div class="card"><label>Anggota</label><select id="sel" style="max-width:260px">${selOpts(st.sel)}</select></div>
- <div class="card tw"><table><tr><th>Mitra</th><th>Tanggal</th><th class="r">Call</th><th class="r">Visit</th><th class="r">KM</th><th class="r">Klaim BBM</th><th>Penjelasan aktivitas</th></tr>`+
- (L.length?L.map(o=>`<tr><td><b>${esc(o.nama)}</b><div class="mu">${esc(o.alamat)}</div></td><td>${fd(o.d)}</td><td class="r">${o.c}</td><td class="r">${o.v}</td><td class="r">${o.k}</td><td class="r">${rp(bbm(o.k))}</td><td>${o.l.map(z=>`<div>${esc(z)}</div>`).join("")}${o.ph.map(k=>`<img hidden class="th" data-zoom data-ph="${esc(k)}">`).join("")}</td></tr>`).join(""):`<tr><td colspan="7" class="mu">Belum ada data pada periode ini.</td></tr>`)+`</table></div>`;
+ <div class="card tw"><table><tr><th>Mitra</th><th>Tanggal</th><th class="r">Call</th><th class="r">Visit</th><th class="r">Closing</th><th class="r">Donasi</th><th class="r">KM</th><th class="r">Klaim BBM</th><th>Penjelasan aktivitas</th></tr>`+
+ (L.length?L.map(o=>`<tr><td><b>${esc(o.nama)}</b><div class="mu">${esc(o.alamat)}</div></td><td>${fd(o.d)}</td><td class="r">${o.c}</td><td class="r">${o.v}</td><td class="r">${o.cs}</td><td class="r">${rp(o.dn)}</td><td class="r">${o.k}</td><td class="r">${rp(bbm(o.k))}</td><td>${o.l.map(z=>`<div>${esc(z)}</div>`).join("")}${o.ph.map(k=>`<img hidden class="th" data-zoom data-ph="${esc(k)}">`).join("")}</td></tr>`).join(""):`<tr><td colspan="9" class="mu">Belum ada data pada periode ini.</td></tr>`)+`</table></div>`;
  fillPh(el);
  document.querySelectorAll("[data-per]").forEach(b=>b.onclick=()=>{st.per=b.dataset.per;render()});
  $("#dd").onchange=x=>{st.date=x.target.value||today();render()};
  $("#sel").onchange=x=>{st.sel=x.target.value;render()}}
 function tEdit(el){
- el.innerHTML=`<div class="card"><label>Anggota</label><select id="es" style="max-width:260px">${selOpts(st.sel)}</select><div class="mu" style="margin-top:6px">Admin dapat mengubah aktivitas anggota pada tanggal yang dipilih.</div></div>`+formPart(st.sel);
- $("#es").onchange=x=>{st.sel=x.target.value;render()};bindForm(st.sel)}
+ el.innerHTML=`<div class="card"><label>Anggota</label><select id="es" style="max-width:260px">${selOpts(st.sel)}</select><div class="mu" style="margin-top:6px">Admin dapat menambah, mengubah, atau menghapus mitra anggota pada tanggal yang dipilih.</div></div>`+formPart(st.sel,"");
+ $("#es").onchange=x=>{st.sel=x.target.value;draft=null;render()};bindForm(st.sel)}
 function tMon(el){
  const L=[];
- for(const m of MEM)if(st.ms==="all"||st.ms===m)for(const d in(S[m]||{}))if(d.startsWith(st.mm))S[m][d].forEach((x,i)=>{if(x.nama.trim()||x.call||x.visit||x.ket)L.push({d,m,x,i})});
+ for(const m of MEM)if(st.ms==="all"||st.ms===m)for(const d in(S[m]||{}))if(d.startsWith(st.mm))S[m][d].forEach(x=>{if(nb(x))L.push({d,m,x})});
  L.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
  el.innerHTML=`<div class="card grid"><div><label>Bulan</label><input type="month" id="mm" value="${st.mm}"></div><div><label>Anggota</label><select id="ms">${selOpts(st.ms,1)}</select></div></div>
- <div class="card tw"><table><tr><th>Tanggal</th><th>Anggota</th><th>Mitra</th><th class="r">Call</th><th class="r">Visit</th><th class="r">KM</th><th>Keterangan aktivitas</th></tr>`+
- (L.length?L.map(({d,m,x,i})=>`<tr><td>${fd(d)}</td><td>${esc(m)}</td><td><b>${esc(x.nama)||"-"}</b><div class="mu">${esc(x.alamat)}</div></td><td class="r">${x.call}</td><td class="r">${x.visit}</td><td class="r">${km(x)}</td><td><b>${x.jenis}</b>${x.ket?": "+esc(x.ket):""}${x.foto?`<div><img hidden class="th" data-zoom data-ph="${esc(m+"|"+d+"|"+i)}"></div>`:""}</td></tr>`).join(""):`<tr><td colspan="7" class="mu">Belum ada aktivitas.</td></tr>`)+`</table></div>`;
+ <div class="card tw"><table><tr><th>Tanggal</th><th>Anggota</th><th>Mitra</th><th class="r">Call</th><th class="r">Visit</th><th class="r">Closing</th><th class="r">Donasi</th><th class="r">KM</th><th>Keterangan aktivitas</th></tr>`+
+ (L.length?L.map(({d,m,x})=>`<tr><td>${fd(d)}</td><td>${esc(m)}</td><td><b>${esc(x.nama)||"-"}</b><div class="mu">${esc(x.alamat)}</div></td><td class="r">${+x.call||0}</td><td class="r">${+x.visit||0}</td><td class="r">${+x.closing||0}</td><td class="r">${rp(+x.donasi||0)}</td><td class="r">${km(x)}</td><td><b>${x.jenis}</b>${x.ket?": "+esc(x.ket):""}${x.foto?`<div><img hidden class="th" data-zoom data-ph="${esc(m+"|"+d+"|"+x.id)}"></div>`:""}</td></tr>`).join(""):`<tr><td colspan="9" class="mu">Belum ada aktivitas.</td></tr>`)+`</table></div>`;
  fillPh(el);
  $("#mm").onchange=x=>{st.mm=x.target.value||st.mm;render()};
  $("#ms").onchange=x=>{st.ms=x.target.value;render()}}
@@ -334,7 +358,7 @@ function tSet(el){
 
 /* ---------- Sinkronisasi ---------- */
 let cfgReady=false,subKey="",loaded=false,unsub=null,ldT=0;
-const formFocused=()=>{const a=document.activeElement;return !!(a&&a.matches&&a.matches("#rows input,#rows textarea,#rows select"))};
+const formFocused=()=>{const a=document.activeElement;return !!(a&&a.matches&&a.matches("#draftcard input,#draftcard textarea,#draftcard select"))};
 const loader=t=>`<div class="card" style="text-align:center;margin-top:40px">${t}</div>`;
 function renderSetup(){$("#app").innerHTML=`<div class="card" style="max-width:520px;margin:40px auto"><b>Firebase belum dikonfigurasi</b><p>Isi konstanta <code>FB</code> di bagian atas script <code>index.html</code> dengan konfigurasi dari Firebase Console, lalu simpan ulang.</p></div>`}
 function showErr(e){const c=e&&e.code||String(e),h=/operation-not-allowed|admin-restricted/.test(c)?"Aktifkan Authentication → Sign-in method → Anonymous di Firebase Console.":/permission-denied/.test(c)?"Periksa Firestore Rules: izinkan baca/tulis untuk pengguna yang sudah login (anonim).":"Periksa konfigurasi Firebase dan koneksi internet.";
@@ -352,7 +376,7 @@ function ensure(){const w=want();if(!w)return true;if(w.k===subKey)return loaded
  unsub=w.q().onSnapshot(sn=>{let touched=false;
   sn.docChanges().forEach(ch=>{const x=ch.doc.data(),k=ch.doc.id;if(ch.doc.metadata.hasPendingWrites||timers[k])return;
    if(ch.type==="removed"){if(S[x.m])delete S[x.m][x.d]}
-   else{(S[x.m]=S[x.m]||{})[x.d]=x.rows;if(loaded&&x.d===st.date&&(x.m===st.user||(st.user===ADM&&st.tab==="edit"&&x.m===st.sel)))touched=true}});
+   else{(S[x.m]=S[x.m]||{})[x.d]=norm(x.rows);if(loaded&&x.d===st.date&&(x.m===st.user||(st.user===ADM&&st.tab==="edit"&&x.m===st.sel)))touched=true}});
   const first=!loaded;
   if(first&&sn.metadata&&sn.metadata.fromCache&&sn.empty){if(!ldT)ldT=setTimeout(()=>{if(!loaded){loaded=true;render()}},3000);return}
   loaded=true;clearTimeout(ldT);ldT=0;
@@ -384,7 +408,7 @@ $("#exp").onclick=exportXlsx;
 $("#bk").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"}));a.download="aktivitas-sales.json";a.click()};
 $("#imp").onclick=()=>$("#file").click();
 $("#file").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
- r.onload=()=>{try{const o=JSON.parse(r.result);let n=0;for(const m in o)for(const d in o[m]){(S[m]=S[m]||{})[d]=o[m][d];if(db)db.collection("days").doc(dkey(m,d)).set({m,d,rows:o[m][d],ts:Date.now()});n++}render();alert("Impor selesai: "+n+" hari data.")}catch(x){alert("File tidak valid.")}};r.readAsText(f);e.target.value=""};
+ r.onload=()=>{try{const o=JSON.parse(r.result);let n=0;for(const m in o)for(const d in o[m]){const rr=norm(o[m][d]);(S[m]=S[m]||{})[d]=rr;if(db)db.collection("days").doc(dkey(m,d)).set({m,d,rows:rr,ts:Date.now()});n++}render();alert("Impor selesai: "+n+" hari data.")}catch(x){alert("File tidak valid.")}};r.readAsText(f);e.target.value=""};
 boot();
 </script>
 </body>
